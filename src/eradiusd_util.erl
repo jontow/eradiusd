@@ -1,12 +1,12 @@
 -module(eradiusd_util).
 
--export([start/0, init/0, test/2, auth/2]).
+-export([start/0, init/0, test/2, auth/2, load_config/0]).
 
 -include_lib("eradius/include/eradius_lib.hrl").
 -include_lib("eradius/include/eradius_dict.hrl").
 -include_lib("eradius/include/dictionary.hrl").
 
--define(RAS_CONFIG, "ras_config.erl").
+-define(CONFIG_FILE, "config.erl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
@@ -37,21 +37,29 @@ init() ->
 load_config() ->
 	% this should be from a config file..
 	io:format("Loading config~n"),
-	case file:consult(?RAS_CONFIG) of
+	case file:consult(?CONFIG_FILE) of
 		{ok, Config} when is_list(Config) ->
-			lists:foreach(fun({ListenIP, ListenPort, Secret}) when is_tuple(ListenIP) ->
-					io:format("RAS: ~p:~p (~p)~n", [ListenIP, ListenPort, Secret]),
-					eradius_server:define_ras(ListenIP, ListenPort, Secret, {eradiusd_util, auth});
-				({Address, ListenPort, Secret}) when is_list(Address) ->
-					{ok, ListenIP} = inet_parse:address(Address),
-					io:format("RAS: ~p:~p (~p)~n", [ListenIP, ListenPort, Secret]),
-					eradius_server:define_ras(ListenIP, ListenPort, Secret, {eradiusd_util, auth});
-				(_Other) ->
-					io:format("Malformed config line: ~p~n", [Config])
+			lists:foreach(fun(Line = {CfgType, Params}) ->
+				io:format("Config line: ~p (~p)~n", [Line, CfgType]),
+				case load_config(CfgType, Params) of
+					{ok, Type, Cfg} ->
+						io:format("Loaded ok: ~p (~p)~n", [Type, Cfg]);
+					{error, Reason, Cfg} ->
+						io:format("Failed to load: ~p (~p)~n", [Reason, Cfg])
+				end
 			end, Config);
 		{error, Reason} ->
-			io:format("Malformed config file ~p: ~p~n", [?RAS_CONFIG, file:format_error(Reason)])
+			io:format("Malformed config file ~p: ~p~n", [?CONFIG_FILE, file:format_error(Reason)])
 	end.
+
+load_config(bind, Cfg = [ListenIP, ListenPort]) ->
+	{ok, bind, Cfg};
+load_config(ras, Cfg = [ListenIP, ListenPort, Secret]) ->
+	{ok, ras, Cfg};
+load_config(realm, Cfg = [Domain, Required]) ->
+	{ok, realm, Cfg};
+load_config(ConfigType, Other) ->
+	{error, badcfg, {ConfigType, Other}}.
 
 % Minimal (!) example of Access Request handler
 test(#rad_pdu{}, #nas_prop{}) ->

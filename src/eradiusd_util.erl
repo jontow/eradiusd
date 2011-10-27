@@ -1,10 +1,32 @@
 -module(eradiusd_util).
 
--export([init/0, test/2, auth/2]).
+-export([start/0, init/0, test/2, auth/2]).
 
 -include_lib("eradius/include/eradius_lib.hrl").
 -include_lib("eradius/include/eradius_dict.hrl").
 -include_lib("eradius/include/dictionary.hrl").
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%% elegant start code stolen from lager: 
+%% https://github.com/basho/lager/blob/master/src/lager.erl#L37 (thanks, andrew)
+%%
+
+start() -> start(eradiusd).
+
+start(App) ->
+    start_ok(App, application:start(App, permanent)).
+
+start_ok(_App, ok) -> ok;
+start_ok(_App, {error, {already_started, _App}}) -> ok;
+start_ok(App, {error, {not_started, Dep}}) -> 
+    ok = start(Dep),
+    start(App);
+start_ok(App, {error, Reason}) -> 
+    erlang:error({app_start_failed, App, Reason}).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 init() ->
 	eradius_server:create_tables([node()]),
@@ -22,7 +44,7 @@ test(#rad_pdu{}, #nas_prop{}) ->
     #rad_accept{}.
 
 auth(#rad_pdu{} = Pdu, #nas_prop{} = Nas) ->
-    io:format("Auth spawned~n"),
+    io:format("Auth spawned: ~p~n", [Pdu#rad_pdu.cmd]),
     {request, Attrs} = Pdu#rad_pdu.cmd,
 	io:format("Attributes: ~p~n", [Attrs]),
     case lookup(?User_Name, Attrs) of
@@ -79,9 +101,10 @@ chap(User, <<Chap_id, Chap_pass/binary>>, Chap_challenge) ->
              #rad_reject{}
     end.
 
-lookup(Key, [{#attribute{id = Key}, Val}|_T]) ->
+lookup(Key, [{Key, Val}|_T]) ->
     {ok, Val};
 lookup(Key, [_|T]) ->
+	io:format("Lookup key: ~p // tail: ~p~n", [Key, T]),
     lookup(Key, T);
 lookup(_, []) ->
     false.

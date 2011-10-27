@@ -20,7 +20,7 @@ test:
 run:
 	rm -fr mnesia
 	mkdir mnesia
-	erl -mnesia dir '"mnesia"' -pa deps/*/ebin ebin
+	erl -mnesia dir '"mnesia"' -pa deps/*/ebin ebin #-run eradiusd start
 
 ##
 ## Doc targets

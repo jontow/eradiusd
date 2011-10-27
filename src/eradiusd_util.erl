@@ -76,9 +76,12 @@ auth(#rad_pdu{} = Pdu, #nas_prop{} = Nas) ->
 pap(User, Req_pass, Secret, Auth) ->
     case get_user(User) of
         {ok, Passwd} ->
+			io:format("pap() got password back: ~p:~p:~p~n", [User, Passwd, Auth]),
             Enc_pass = eradius_lib:mk_password(Secret, Auth, Passwd),
             Req_pass1 = list_to_binary(Req_pass),
+			io:format("Pass compare: ~p == ~p~n", [Enc_pass, Req_pass1]),
             if Enc_pass == Req_pass1 ->
+					io:format("pap() sending Access-Accept~n"),
                     #rad_accept{};
                true ->
                     io:format("PAP~p~n",[{User, Req_pass, Secret, Auth, Enc_pass}]),
@@ -114,14 +117,21 @@ get_user(User) ->
 	{ok, Bin} = file:read_file("passwords.txt"),
 	Lines = binary:split(Bin, <<"\n">>),
 	Rows = lists:map(fun(Line) -> binary:split(Line, <<":">>, [global]) end, Lines),
-	io:format("Calling get_pass(~p // ~p)~n", [Rows, User]),
-	get_pass(Rows, User).
+	io:format("Calling get_pass(~p // ~p)~n", [User, Rows]),
+	case get_pass(User, Rows) of
+		{ok, User, Pass} ->
+			io:format("get_pass() succeeded, returning~n"),
+			{ok, Pass};
+		false ->
+			false
+	end.
 
-get_pass([_H = <<User, Pass, _>>|_T], User) ->
-	io:format("Trying match on ~p:~p~n", [User, Pass]),
+get_pass(User, [[User, Pass, _]|_T]) ->
+	io:format("get_pass() successful match on ~p // ~p~n", [User, Pass]),
 	{ok, User, Pass};
-get_pass([H|T], User) ->
-	io:format("Trying match on ~p~n", [H]),
+get_pass(User, [H|T]) ->
+	io:format("get_pass() trying match on ~p // ~p~n", [User, H]),
 	get_pass(T, User);
-get_pass([], _User) ->
+get_pass(User, []) ->
+	io:format("get_pass() no match on ~p~n", [User]),
 	false.

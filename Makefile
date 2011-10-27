@@ -17,6 +17,11 @@ distclean: clean
 test:
 	./rebar compile eunit
 
+run:
+	rm -fr mnesia
+	mkdir mnesia
+	erl -mnesia dir '"mnesia"' -pa deps/*/ebin ebin
+
 ##
 ## Doc targets
 ##

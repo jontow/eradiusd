@@ -10,7 +10,10 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    eradiusd_sup:start_link().
+    mnesia:create_schema([node()]),
+    mnesia:start(),
+    eradiusd_sup:start_link(),
+	eradiusd:start().
 
 stop(_State) ->
     ok.

@@ -26,7 +26,6 @@ start_link() ->
 init([]) ->
 	{ok, {{one_for_one, 5, 10}, [
 		{eradius_server, {eradius_server, start_link, []}, permanent, 10000, worker, [eradius_server]},
-		{eradius_dict, {eradius_dict, start_link, []}, permanent, 10000, worker, [erdius_dict]},
-		{eradiusd, {eradiusd, start_link, []}, permanent, 10000, worker, [eradiusd]}
+		{eradius_dict, {eradius_dict, start_link, []}, permanent, 10000, worker, [erdius_dict]}
 	] }}.
 

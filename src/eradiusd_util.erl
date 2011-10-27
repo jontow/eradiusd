@@ -1,6 +1,6 @@
 -module(eradiusd_util).
 
--export([init/0]).
+-export([init/0, test/2]).
 
 -include_lib("eradius/include/eradius_lib.hrl").
 -include_lib("eradius/include/eradius_dict.hrl").

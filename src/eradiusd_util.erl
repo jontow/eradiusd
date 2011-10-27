@@ -113,8 +113,8 @@ get_user(User) ->
 	io:format("Reading passwords.txt~n"),
 	{ok, Bin} = file:read_file("passwords.txt"),
 	Lines = binary:split(Bin, <<"\n">>),
-	Rows = lists:map(fun(Line) -> binary:split(Line, <<":">>) end, Lines),
-	io:format("Calling get_pass()~n"),
+	Rows = lists:map(fun(Line) -> binary:split(Line, <<":">>, [global]) end, Lines),
+	io:format("Calling get_pass(~p // ~p)~n", [Rows, User]),
 	get_pass(Rows, User).
 
 get_pass([_H = <<User, Pass, _>>|_T], User) ->
@@ -125,12 +125,3 @@ get_pass([H|T], User) ->
 	get_pass(T, User);
 get_pass([], _User) ->
 	false.
-
-% Passfile reading, should maybe go like this:
-%{ok, Bin} = file:read_file("filename")
-%Lines = binary:split(Bin, <<"\n">>)
-%Rows = lists:map(fun(Line) -> binary:split(Line, <<":">>) end, Lines)
-%22:22 <@Vagabond> that'll give you a list of 3 element lists
-%22:22 <@Vagabond> like [[<<"user">>, <<"pass">>, <<"package">>], ...]
-%22:23 <@Vagabond> actually, if you used list_to_tuple, you could then use lists:keysearch to search for the 
-%                  user

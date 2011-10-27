@@ -1,15 +1,11 @@
--module(eradiusd).
+-module(eradiusd_util).
 
--export([start/0, start_link/1]).
+-export([init/0]).
 
-start() ->
-	io:format("Starting eradiusd~n"),
+init() ->
 	eradius_server:create_tables([node()]),
 	load_config(),
 	ok.
-
-start_link([]) ->
-	start().
 
 load_config() ->
 	% this should be from a config file..

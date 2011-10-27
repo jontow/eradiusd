@@ -6,6 +6,7 @@
 -include_lib("eradius/include/eradius_dict.hrl").
 -include_lib("eradius/include/dictionary.hrl").
 
+-define(RAS_CONFIG, "ras_config.erl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
@@ -36,7 +37,21 @@ init() ->
 load_config() ->
 	% this should be from a config file..
 	io:format("Loading config~n"),
-	eradius_server:define_ras({127,0,0,1}, 1812, "secret", {eradiusd_util, auth}).
+	case file:consult(?RAS_CONFIG) of
+		{ok, Config} when is_list(Config) ->
+			lists:foreach(fun({ListenIP, ListenPort, Secret}) when is_tuple(ListenIP) ->
+					io:format("RAS: ~p:~p (~p)~n", [ListenIP, ListenPort, Secret]),
+					eradius_server:define_ras(ListenIP, ListenPort, Secret, {eradiusd_util, auth});
+				({Address, ListenPort, Secret}) when is_list(Address) ->
+					{ok, ListenIP} = inet_parse:address(Address),
+					io:format("RAS: ~p:~p (~p)~n", [ListenIP, ListenPort, Secret]),
+					eradius_server:define_ras(ListenIP, ListenPort, Secret, {eradiusd_util, auth});
+				(_Other) ->
+					io:format("Malformed config line: ~p~n", [Config])
+			end, Config);
+		{error, Reason} ->
+			io:format("Malformed config file ~p: ~p~n", [?RAS_CONFIG, file:format_error(Reason)])
+	end.
 
 % Minimal (!) example of Access Request handler
 test(#rad_pdu{}, #nas_prop{}) ->

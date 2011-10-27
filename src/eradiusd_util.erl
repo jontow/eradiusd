@@ -44,14 +44,15 @@ test(#rad_pdu{}, #nas_prop{}) ->
     #rad_accept{}.
 
 auth(#rad_pdu{} = Pdu, #nas_prop{} = Nas) ->
-    io:format("Auth spawned: ~p~n", [Pdu#rad_pdu.cmd]),
+    io:format("Auth spawned~n"),
+    %io:format("Auth spawned: ~p~n", [Pdu#rad_pdu.cmd]),
     {request, Attrs} = Pdu#rad_pdu.cmd,
-	io:format("Attributes: ~p~n", [Attrs]),
+	%io:format("Attributes: ~p~n", [Attrs]),
     case lookup(?User_Name, Attrs) of
         {ok, User} ->
             case lookup(?User_Password, Attrs) of
                 {ok, Pass} ->
-					io:format("pap authentication~n"),
+					io:format("Request (PAP authentication) for ~p~n", [User]),
                     pap(User, Pass, Nas#nas_prop.secret, Pdu#rad_pdu.authenticator);
                 false ->
                     case lookup(?CHAP_Password, Attrs) of
@@ -62,26 +63,25 @@ auth(#rad_pdu{} = Pdu, #nas_prop{} = Nas) ->
                                             false ->
                                                 Pdu#rad_pdu.authenticator
                                         end,
-							io:format("chap authentication~n"),
+							io:format("Request (CHAP authentication) for ~p~n", [User]),
                             chap(User, list_to_binary(Chap_pass), Challenge);
                         false ->
                             #rad_reject{}
                     end
             end;
         false ->
-			io:format("lookup username failed~n"),
+			io:format("Username lookup failed: ~p~n", [?User_Name]),
             #rad_reject{}
     end.
 
 pap(User, Req_pass, Secret, Auth) ->
+	%io:format("pap() called with: (~p), (~p), (~p), (~p)~n", [User, Req_pass, Secret, Auth]),
     case get_user(User) of
         {ok, Passwd} ->
-			io:format("pap() got password back: ~p:~p:~p~n", [User, Passwd, Auth]),
+			%io:format("pap() got password back: ~p:~p:~p~n", [User, Passwd, Auth]),
             Enc_pass = eradius_lib:mk_password(Secret, Auth, Passwd),
-            Req_pass1 = list_to_binary(Req_pass),
-			io:format("Pass compare: ~p == ~p~n", [Enc_pass, Req_pass1]),
-            if Enc_pass == Req_pass1 ->
-					io:format("pap() sending Access-Accept~n"),
+            if Enc_pass == Req_pass ->
+					io:format("pap() sending Access-Accept for ~p~n", [User]),
                     #rad_accept{};
                true ->
                     io:format("PAP~p~n",[{User, Req_pass, Secret, Auth, Enc_pass}]),
@@ -107,31 +107,31 @@ chap(User, <<Chap_id, Chap_pass/binary>>, Chap_challenge) ->
 lookup(Key, [{Key, Val}|_T]) ->
     {ok, Val};
 lookup(Key, [_|T]) ->
-	io:format("Lookup key: ~p // tail: ~p~n", [Key, T]),
+	%io:format("Lookup key: ~p // tail: ~p~n", [Key, T]),
     lookup(Key, T);
 lookup(_, []) ->
     false.
 
 get_user(User) ->
-	io:format("Reading passwords.txt~n"),
+	%io:format("Reading passwords.txt~n"),
 	{ok, Bin} = file:read_file("passwords.txt"),
-	Lines = binary:split(Bin, <<"\n">>),
+	Lines = binary:split(Bin, <<"\n">>, [global]),
 	Rows = lists:map(fun(Line) -> binary:split(Line, <<":">>, [global]) end, Lines),
-	io:format("Calling get_pass(~p // ~p)~n", [User, Rows]),
+	%io:format("Calling get_pass(~p // ~p)~n", [User, Rows]),
 	case get_pass(User, Rows) of
 		{ok, User, Pass} ->
-			io:format("get_pass() succeeded, returning~n"),
+			%io:format("get_pass() succeeded, returning~n"),
 			{ok, Pass};
 		false ->
 			false
 	end.
 
 get_pass(User, [[User, Pass, _]|_T]) ->
-	io:format("get_pass() successful match on ~p // ~p~n", [User, Pass]),
+	%io:format("get_pass() successful match on ~p // ~p~n", [User, Pass]),
 	{ok, User, Pass};
-get_pass(User, [H|T]) ->
-	io:format("get_pass() trying match on ~p // ~p~n", [User, H]),
-	get_pass(T, User);
-get_pass(User, []) ->
-	io:format("get_pass() no match on ~p~n", [User]),
+get_pass(User, [_H|T]) ->
+	%o:format("get_pass() trying match on ~p // ~p~n", [User, H]),
+	get_pass(User, T);
+get_pass(_User, []) ->
+	%io:format("get_pass() no match on ~p~n", [User]),
 	false.

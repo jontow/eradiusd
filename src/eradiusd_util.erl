@@ -52,14 +52,26 @@ load_config() ->
 			io:format("Malformed config file ~p: ~p~n", [?CONFIG_FILE, file:format_error(Reason)])
 	end.
 
-load_config(bind, Cfg = [ListenIP, ListenPort]) ->
+load_config(bind, Cfg = [ListenIP, ListenPort]) when is_tuple(ListenIP) ->
+	io:format("Binding RADIUS server to ~p:~p~n", [ListenIP, ListenPort]),
+	eradius_server:start_link(ListenIP, ListenPort),
+	{ok, bind, Cfg};
+load_config(bind, Cfg = [Address, ListenPort]) when is_list(Address) ->
+	{ok, ListenIP} = inet_parse:address(Address),
+	io:format("Binding RADIUS server to ~p:~p~n", [ListenIP, ListenPort]),
+	eradius_server:start_link(ListenIP, ListenPort),
 	{ok, bind, Cfg};
 load_config(ras, Cfg = [ListenIP, ListenPort, Secret]) ->
+	start_ras(ListenIP, ListenPort, Secret),
 	{ok, ras, Cfg};
-load_config(realm, Cfg = [Domain, Required]) ->
+load_config(realm, Cfg = [_Domain, _Required]) ->
 	{ok, realm, Cfg};
 load_config(ConfigType, Other) ->
 	{error, badcfg, {ConfigType, Other}}.
+
+start_ras(ListenIP, ListenPort, Secret) ->
+	io:format("Starting RAS listener: ~p:~p~n", [ListenIP, ListenPort]),
+	eradius_server:define_ras(ListenIP, ListenPort, Secret, {eradius_util, auth}).
 
 % Minimal (!) example of Access Request handler
 test(#rad_pdu{}, #nas_prop{}) ->

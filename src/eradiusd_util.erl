@@ -61,7 +61,11 @@ load_config(bind, Cfg = [Address, ListenPort]) when is_list(Address) ->
 	io:format("Binding RADIUS server to ~p:~p~n", [ListenIP, ListenPort]),
 	eradius_server:start_link(ListenIP, ListenPort),
 	{ok, bind, Cfg};
-load_config(ras, Cfg = [ListenIP, ListenPort, Secret]) ->
+load_config(ras, Cfg = [ListenIP, ListenPort, Secret]) when is_tuple(ListenIP) ->
+	start_ras(ListenIP, ListenPort, Secret),
+	{ok, ras, Cfg};
+load_config(ras, Cfg = [Address, ListenPort, Secret]) when is_list(Address) ->
+	{ok, ListenIP} = inet_parse:address(Address),
 	start_ras(ListenIP, ListenPort, Secret),
 	{ok, ras, Cfg};
 load_config(realm, Cfg = [_Domain, _Required]) ->

@@ -12,9 +12,9 @@
 start(_StartType, _StartArgs) ->
     mnesia:create_schema([node()]),
     mnesia:start(),
-   	eradiusd_sup:start_link(),
+   	{ok, Pid} = eradiusd_sup:start_link(),
 	eradiusd_util:init(),
-	{ok, self()}.
+	{ok, Pid}.
 
 stop(_State) ->
     ok.

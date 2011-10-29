@@ -55,11 +55,13 @@ load_config() ->
 load_config(bind, Cfg = [ListenIP, ListenPort]) when is_tuple(ListenIP) ->
 	io:format("Binding RADIUS server to ~p:~p~n", [ListenIP, ListenPort]),
 	supervisor:start_child(eradiusd_server_sup, [ListenIP, ListenPort]),
+	eradius_server:trace_on(ListenIP, ListenPort),
 	{ok, bind, Cfg};
 load_config(bind, Cfg = [Address, ListenPort]) when is_list(Address) ->
 	{ok, ListenIP} = inet_parse:address(Address),
 	io:format("Binding RADIUS server to ~p:~p~n", [ListenIP, ListenPort]),
 	supervisor:start_child(eradiusd_server_sup, [ListenIP, ListenPort]),
+	eradius_server:trace_on(ListenIP, ListenPort),
 	{ok, bind, Cfg};
 load_config(ras, Cfg = [ListenIP, ListenPort, Secret]) when is_tuple(ListenIP) ->
 	start_ras(ListenIP, ListenPort, Secret),
@@ -75,7 +77,7 @@ load_config(ConfigType, Other) ->
 
 start_ras(ListenIP, ListenPort, Secret) ->
 	io:format("Starting RAS listener: ~p:~p~n", [ListenIP, ListenPort]),
-	eradius_server:define_ras(ListenIP, ListenPort, Secret, {eradius_util, auth}).
+	eradius_server:define_ras(ListenIP, ListenPort, Secret, {eradiusd_util, auth}).
 
 % Minimal (!) example of Access Request handler
 test(#rad_pdu{}, #nas_prop{}) ->

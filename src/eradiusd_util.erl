@@ -7,6 +7,7 @@
 -include_lib("eradius/include/dictionary.hrl").
 
 -define(CONFIG_FILE, "config.erl").
+-define(TABLENAME, ?MODULE).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
@@ -31,6 +32,7 @@ start_ok(App, {error, Reason}) ->
 
 init() ->
 	eradius_server:create_tables([node()]),
+	ets:new(?TABLENAME, [named_table, public]),
 	load_config(),
 	ok.
 
@@ -70,7 +72,8 @@ load_config(ras, Cfg = [Address, ListenPort, Secret]) when is_list(Address) ->
 	{ok, ListenIP} = inet_parse:address(Address),
 	start_ras(ListenIP, ListenPort, Secret),
 	{ok, ras, Cfg};
-load_config(realm, Cfg = [_Domain, _Required]) ->
+load_config(realm, Cfg = [Domain, Required]) ->
+	ets:insert(?TABLENAME, {Domain, Required}),
 	{ok, realm, Cfg};
 load_config(ConfigType, Other) ->
 	{error, badcfg, {ConfigType, Other}}.
@@ -91,6 +94,9 @@ auth(#rad_pdu{} = Pdu, #nas_prop{} = Nas) ->
 	%io:format("Attributes: ~p~n", [Attrs]),
     case lookup(?User_Name, Attrs) of
         {ok, User} ->
+			[Username, Domain] = binary:split(User, <<"@">>),
+			RealmOpts = ets:lookup(?TABLENAME, Domain),
+			io:format("Found domain/realmopts: ~p / ~p~n", [Domain, RealmOpts]),
             case lookup(?User_Password, Attrs) of
                 {ok, Pass} ->
 					io:format("Request (PAP authentication) for ~p~n", [User]),

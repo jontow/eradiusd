@@ -54,12 +54,12 @@ load_config() ->
 
 load_config(bind, Cfg = [ListenIP, ListenPort]) when is_tuple(ListenIP) ->
 	io:format("Binding RADIUS server to ~p:~p~n", [ListenIP, ListenPort]),
-	eradius_server:start_link(ListenIP, ListenPort),
+	supervisor:start_child(eradiusd_server_sup, [ListenIP, ListenPort]),
 	{ok, bind, Cfg};
 load_config(bind, Cfg = [Address, ListenPort]) when is_list(Address) ->
 	{ok, ListenIP} = inet_parse:address(Address),
 	io:format("Binding RADIUS server to ~p:~p~n", [ListenIP, ListenPort]),
-	eradius_server:start_link(ListenIP, ListenPort),
+	supervisor:start_child(eradiusd_server_sup, [ListenIP, ListenPort]),
 	{ok, bind, Cfg};
 load_config(ras, Cfg = [ListenIP, ListenPort, Secret]) when is_tuple(ListenIP) ->
 	start_ras(ListenIP, ListenPort, Secret),

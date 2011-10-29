@@ -22,6 +22,11 @@ run:
 	mkdir mnesia
 	erl -mnesia dir '"mnesia"' -pa deps/*/ebin ebin -s eradiusd_util
 
+norun:
+	rm -fr mnesia
+	mkdir mnesia
+	erl -mnesia dir '"mnesia"' -pa deps/*/ebin ebin
+
 ##
 ## Doc targets
 ##

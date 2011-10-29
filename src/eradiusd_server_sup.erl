@@ -1,4 +1,4 @@
--module(eradiusd_sup).
+-module(eradiusd_server_sup).
 
 -behaviour(supervisor).
 
@@ -23,12 +23,8 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-	Children = [
-		?CHILD(eradius_dict, worker),
-		?CHILD(eradiusd_server_sup, supervisor)
-	],
-	io:format("Starting supervisors: ~p~n", [Children]),
-	{ok, {{one_for_one, 5, 10}, 
-		Children
-	}}.
+	io:format("Readying eradiusd_server_sup~n"),
+	{ok, {{simple_one_for_one, 5, 10}, [
+		?CHILD(eradius_server, worker)
+	] }}.
 

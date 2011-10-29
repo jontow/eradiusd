@@ -1,6 +1,6 @@
 -module(eradiusd_util).
 
--export([start/0, init/0, test/2, auth/2, load_config/0]).
+-export([start/0, init/0, test/2, auth/2, load_config/0, handle_realm/1]).
 
 -include_lib("eradius/include/eradius_lib.hrl").
 -include_lib("eradius/include/eradius_dict.hrl").
@@ -94,9 +94,6 @@ auth(#rad_pdu{} = Pdu, #nas_prop{} = Nas) ->
 	%io:format("Attributes: ~p~n", [Attrs]),
     case lookup(?User_Name, Attrs) of
         {ok, User} ->
-			[Username, Domain] = binary:split(User, <<"@">>),
-			RealmOpts = ets:lookup(?TABLENAME, Domain),
-			io:format("Found domain/realmopts: ~p / ~p~n", [Domain, RealmOpts]),
             case lookup(?User_Password, Attrs) of
                 {ok, Pass} ->
 					io:format("Request (PAP authentication) for ~p~n", [User]),
@@ -123,7 +120,7 @@ auth(#rad_pdu{} = Pdu, #nas_prop{} = Nas) ->
 
 pap(User, Req_pass, Secret, Auth) ->
 	%io:format("pap() called with: (~p), (~p), (~p), (~p)~n", [User, Req_pass, Secret, Auth]),
-    case get_user(User) of
+    case handle_realm(User) of
         {ok, Passwd} ->
 			%io:format("pap() got password back: ~p:~p:~p~n", [User, Passwd, Auth]),
             Enc_pass = eradius_lib:mk_password(Secret, Auth, Passwd),
@@ -139,7 +136,7 @@ pap(User, Req_pass, Secret, Auth) ->
     end.
 
 chap(User, <<Chap_id, Chap_pass/binary>>, Chap_challenge) ->
-    case get_user(User) of
+    case handle_realm(User) of
         {ok, Passwd} ->
             Enc_pass = erlang:md5([Chap_id, Passwd, Chap_challenge]),
             if Enc_pass == Chap_pass ->
@@ -158,6 +155,35 @@ lookup(Key, [_|T]) ->
     lookup(Key, T);
 lookup(_, []) ->
     false.
+
+% Called as includes_realm(binary:split(username, <<"@">>)
+includes_realm([_User]) ->
+	false;
+includes_realm([_User, _Domain]) ->
+	true.
+
+handle_realm(User) ->
+	case includes_realm(binary:split(User, <<"@">>)) of
+		true ->
+			[Username, Domain] = binary:split(User, <<"@">>),
+			case ets:lookup(?TABLENAME, Domain) of
+				[{Domain, required}] ->
+					io:format("Found domain realmopts(required): ~p~n", [Domain]),
+					get_user(User);
+				[{Domain, optional}] ->
+					io:format("Found domain realmopts(optional): ~p~n", [Domain]),
+					case get_user(Username) of
+						{ok, Passwd} ->
+							{ok, Passwd};
+						_ ->
+							get_user(User)
+					end;
+				[] ->
+					get_user(User)
+			end;
+		false ->
+			get_user(User)
+	end.
 
 get_user(User) ->
 	%io:format("Reading passwords.txt~n"),

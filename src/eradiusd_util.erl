@@ -1,6 +1,7 @@
 -module(eradiusd_util).
 
--export([start/0, init/0, test/2, auth/2, load_config/0, handle_realm/1]).
+-export([start/0, init/0, test/2, auth/2, load_config/0]).
+-export([get_user/1, handle_realm/1]).
 
 -include_lib("eradius/include/eradius_lib.hrl").
 -include_lib("eradius/include/eradius_dict.hrl").
@@ -65,6 +66,7 @@ load_config(bind, Cfg = [Address, ListenPort]) when is_list(Address) ->
 	supervisor:start_child(eradiusd_server_sup, [ListenIP, ListenPort]),
 	eradius_server:trace_on(ListenIP, ListenPort),
 	{ok, bind, Cfg};
+
 load_config(ras, Cfg = [ListenIP, ListenPort, Secret]) when is_tuple(ListenIP) ->
 	start_ras(ListenIP, ListenPort, Secret),
 	{ok, ras, Cfg};
@@ -72,9 +74,15 @@ load_config(ras, Cfg = [Address, ListenPort, Secret]) when is_list(Address) ->
 	{ok, ListenIP} = inet_parse:address(Address),
 	start_ras(ListenIP, ListenPort, Secret),
 	{ok, ras, Cfg};
+
+load_config(realm, Cfg = [Domain, [Required, default]]) ->
+	ets:insert(?TABLENAME, {defaultdomain, Domain}),
+	ets:insert(?TABLENAME, {Domain, Required}),
+	{ok, realm, Cfg};
 load_config(realm, Cfg = [Domain, Required]) ->
 	ets:insert(?TABLENAME, {Domain, Required}),
 	{ok, realm, Cfg};
+
 load_config(ConfigType, Other) ->
 	{error, badcfg, {ConfigType, Other}}.
 
@@ -169,20 +177,44 @@ handle_realm(User) ->
 			case ets:lookup(?TABLENAME, Domain) of
 				[{Domain, required}] ->
 					io:format("Found domain realmopts(required): ~p~n", [Domain]),
+					io:format("Trying ~p~n", [User]),
 					get_user(User);
 				[{Domain, optional}] ->
 					io:format("Found domain realmopts(optional): ~p~n", [Domain]),
+					io:format("Trying ~p~n", [Username]),
 					case get_user(Username) of
 						{ok, Passwd} ->
 							{ok, Passwd};
 						_ ->
+							io:format("Failed, trying ~p~n", [User]),
 							get_user(User)
 					end;
 				[] ->
+					io:format("No realm configuration matched, trying ~p~n", [User]),
 					get_user(User)
 			end;
 		false ->
-			get_user(User)
+			io:format("User passed without realm, trying ~p~n", [User]),
+			case get_user(User) of
+				{ok, Passwd} ->
+					io:format("Succeeded~n"),
+					{ok, Passwd};
+				_ ->
+					io:format("Failed, trying default domain: ~p~n", [ets:lookup(?TABLENAME, defaultdomain)]),
+					case ets:lookup(?TABLENAME, defaultdomain) of
+						[{defaultdomain, DefDomain}] ->
+							io:format("Looked up default domain: ~p~n", [DefDomain]),
+							FullUser = <<User/binary, <<"@">>/binary, DefDomain/binary>>,
+							io:format("User passed without realm, trying ~p~n", [FullUser]),
+							get_user(FullUser);
+						[] ->
+							io:format("No default domain configured~n"),
+							#rad_reject{};
+						Other ->
+							io:format("Got back some unexpected nonsense.. ~p~n", [Other]),
+							#rad_reject{}
+					end
+			end
 	end.
 
 get_user(User) ->
